@@ -8,8 +8,11 @@ import (
 	"math/rand"
 	"net/http"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
+
+	"s.mcquay.me/dm/vain/metrics"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -33,20 +36,16 @@ var (
 		[]string{"route"},
 	)
 
-	// DB tracks timing of interactions with the file system.
-	Msgs = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Name: "msgs",
-			Help: "silly msgs.",
-		},
-		[]string{"msgs"},
-	)
+	ECount = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ecount",
+		Help: "Number of times ecount has been called",
+	})
 )
 
 func init() {
 	prometheus.MustRegister(Errors)
 	prometheus.MustRegister(Func)
-	prometheus.MustRegister(Msgs)
+	prometheus.MustRegister(ECount)
 	rand.Seed(time.Now().UnixNano())
 }
 
@@ -90,20 +89,50 @@ func sleep(w http.ResponseWriter, r *http.Request) {
 	time.Sleep(time.Second * time.Duration(i))
 }
 
-func silly(w http.ResponseWriter, r *http.Request) {
-	searchreq := r.URL.Path[len("/silly/"):]
+func up(w http.ResponseWriter, r *http.Request) {
+	searchreq := r.URL.Path[len("/up/"):]
 	if len(searchreq) == 0 {
+		metrics.Errors.WithLabelValues(fmt.Sprintf("%d", http.StatusBadRequest)).Add(1)
 		b, _ := json.Marshal(NewFailure("url could not be parsed"))
 		http.Error(w, string(b), http.StatusBadRequest)
 		return
 	}
 	if searchreq[len(searchreq)-1] != '/' {
-		http.Redirect(w, r, "/silly/"+searchreq+"/", http.StatusMovedPermanently)
+		http.Redirect(w, r, "/up/"+searchreq+"/", http.StatusMovedPermanently)
 		return
 	}
 	searchReqParsed := strings.Split(searchreq, "/")
-	//Msgs.WithLabelValues("silly").Observe(searchReqParsed[0])
-	fmt.Fprintf(w, fmt.Sprintf("%s\n", searchReqParsed[0]))
+	s, err := strconv.Atoi(searchReqParsed[0])
+	if err != nil {
+		metrics.Errors.WithLabelValues(fmt.Sprintf("%d", http.StatusBadRequest)).Add(1)
+		b, _ := json.Marshal(NewFailure(fmt.Sprintf("could not convert %v to an int", searchReqParsed[0])))
+		http.Error(w, string(b), http.StatusBadRequest)
+		return
+	}
+	ECount.Add(float64(s))
+}
+
+func down(w http.ResponseWriter, r *http.Request) {
+	searchreq := r.URL.Path[len("/down/"):]
+	if len(searchreq) == 0 {
+		metrics.Errors.WithLabelValues(fmt.Sprintf("%d", http.StatusBadRequest)).Add(1)
+		b, _ := json.Marshal(NewFailure("url could not be parsed"))
+		http.Error(w, string(b), http.StatusBadRequest)
+		return
+	}
+	if searchreq[len(searchreq)-1] != '/' {
+		http.Redirect(w, r, "/down/"+searchreq+"/", http.StatusMovedPermanently)
+		return
+	}
+	searchReqParsed := strings.Split(searchreq, "/")
+	s, err := strconv.Atoi(searchReqParsed[0])
+	if err != nil {
+		metrics.Errors.WithLabelValues(fmt.Sprintf("%d", http.StatusBadRequest)).Add(1)
+		b, _ := json.Marshal(NewFailure(fmt.Sprintf("could not convert %v to an int", searchReqParsed[0])))
+		http.Error(w, string(b), http.StatusBadRequest)
+		return
+	}
+	ECount.Sub(float64(s))
 }
 
 func main() {
@@ -111,6 +140,7 @@ func main() {
 	http.Handle("/metrics", prometheus.Handler())
 	http.HandleFunc("/demo", demo)
 	http.HandleFunc("/sleep", sleep)
-	http.HandleFunc("/silly/", silly)
+	http.HandleFunc("/down/", down)
+	http.HandleFunc("/up/", up)
 	log.Fatal(http.ListenAndServe(*addr, nil))
 }
