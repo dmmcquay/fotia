@@ -90,6 +90,7 @@ func sleep(w http.ResponseWriter, r *http.Request) {
 }
 
 func up(w http.ResponseWriter, r *http.Request) {
+	defer Time()()
 	searchreq := r.URL.Path[len("/up/"):]
 	if len(searchreq) == 0 {
 		metrics.Errors.WithLabelValues(fmt.Sprintf("%d", http.StatusBadRequest)).Add(1)
@@ -113,6 +114,7 @@ func up(w http.ResponseWriter, r *http.Request) {
 }
 
 func down(w http.ResponseWriter, r *http.Request) {
+	defer Time()()
 	searchreq := r.URL.Path[len("/down/"):]
 	if len(searchreq) == 0 {
 		metrics.Errors.WithLabelValues(fmt.Sprintf("%d", http.StatusBadRequest)).Add(1)
