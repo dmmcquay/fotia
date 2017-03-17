@@ -77,11 +77,6 @@ func Time() func() {
 
 var addr = flag.String("addr", ":8080", "The address to listen on for HTTP requests.")
 
-func demo(w http.ResponseWriter, r *http.Request) {
-	defer Time()()
-	fmt.Fprintf(w, "Hi there, I love %s!", r.URL.Path[1:])
-}
-
 func sleep(w http.ResponseWriter, r *http.Request) {
 	defer Time()()
 	i := rand.Intn(10)
@@ -140,7 +135,6 @@ func down(w http.ResponseWriter, r *http.Request) {
 func main() {
 	flag.Parse()
 	http.Handle("/metrics", prometheus.Handler())
-	http.HandleFunc("/demo", demo)
 	http.HandleFunc("/sleep", sleep)
 	http.HandleFunc("/down/", down)
 	http.HandleFunc("/up/", up)
